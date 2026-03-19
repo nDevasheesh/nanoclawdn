@@ -33,7 +33,10 @@ export interface ProxyConfig {
 // Request condensing helpers
 // ---------------------------------------------------------------------------
 
-function condenseRequest(parsed: Record<string, unknown>, model: string | undefined): void {
+function condenseRequest(
+  parsed: Record<string, unknown>,
+  model: string | undefined,
+): void {
   // Override model
   if (model && parsed.model !== undefined) parsed.model = model;
 
@@ -52,10 +55,17 @@ function condenseRequest(parsed: Record<string, unknown>, model: string | undefi
   // Drop heavy Claude Code code-editing tools (Bash, Read, Write, etc.) that
   // exceed non-Anthropic model context limits, but keep Task/TeamCreate so
   // Delo (Flash) can spawn Claude coding sub-agents for coding work.
-  const AGENT_TOOLS = new Set(['Task', 'TaskOutput', 'TaskStop', 'TeamCreate', 'TeamDelete', 'SendMessage']);
+  const AGENT_TOOLS = new Set([
+    'Task',
+    'TaskOutput',
+    'TaskStop',
+    'TeamCreate',
+    'TeamDelete',
+    'SendMessage',
+  ]);
   if (Array.isArray(parsed.tools)) {
-    parsed.tools = (parsed.tools as Array<{ name: string }>).filter((t) =>
-      t.name.startsWith('mcp__nanoclaw__') || AGENT_TOOLS.has(t.name),
+    parsed.tools = (parsed.tools as Array<{ name: string }>).filter(
+      (t) => t.name.startsWith('mcp__nanoclaw__') || AGENT_TOOLS.has(t.name),
     );
     if ((parsed.tools as unknown[]).length === 0) delete parsed.tools;
   }
@@ -78,23 +88,29 @@ function condenseRequest(parsed: Record<string, unknown>, model: string | undefi
   // Clean messages
   if (Array.isArray(parsed.messages)) {
     let seenContext = false;
-    parsed.messages = (parsed.messages as Array<{ role: string; content: unknown }>)
+    parsed.messages = (
+      parsed.messages as Array<{ role: string; content: unknown }>
+    )
       .filter((msg) => {
         if (msg.role !== 'assistant') return true;
         const c = msg.content;
         if (!c) return false;
-        if (typeof c === 'string') return c.trim() !== '' && c.trim() !== '(no content)';
+        if (typeof c === 'string')
+          return c.trim() !== '' && c.trim() !== '(no content)';
         if (Array.isArray(c)) return (c as unknown[]).length > 0;
         return true;
       })
       .map((msg) => {
-        const blocks: Array<{ type: string; text?: string }> = Array.isArray(msg.content)
+        const blocks: Array<{ type: string; text?: string }> = Array.isArray(
+          msg.content,
+        )
           ? (msg.content as Array<{ type: string; text?: string }>)
           : [{ type: 'text', text: String(msg.content) }];
 
         const cleaned = blocks
           .map((block) => {
-            if (block.type !== 'text' || typeof block.text !== 'string') return block;
+            if (block.type !== 'text' || typeof block.text !== 'string')
+              return block;
             let text = block.text
               .replace(/<system-reminder>[\s\S]*?<\/system-reminder>\n?/g, '')
               .trim();
@@ -128,16 +144,25 @@ function isNonAnthropicModel(model: string | undefined): boolean {
   return !m.startsWith('claude') && !m.startsWith('anthropic/claude');
 }
 
-function anthropicToOpenAI(parsed: Record<string, unknown>): Record<string, unknown> {
+function anthropicToOpenAI(
+  parsed: Record<string, unknown>,
+): Record<string, unknown> {
   const messages: Array<{ role: string; content: string }> = [];
 
   // System prompt
-  if (parsed.system && typeof parsed.system === 'string' && parsed.system.trim()) {
+  if (
+    parsed.system &&
+    typeof parsed.system === 'string' &&
+    parsed.system.trim()
+  ) {
     messages.push({ role: 'system', content: parsed.system });
   }
 
   // Conversation messages
-  for (const msg of (parsed.messages as Array<{ role: string; content: unknown }>) || []) {
+  for (const msg of (parsed.messages as Array<{
+    role: string;
+    content: unknown;
+  }>) || []) {
     const content =
       typeof msg.content === 'string'
         ? msg.content
@@ -158,35 +183,69 @@ function anthropicToOpenAI(parsed: Record<string, unknown>): Record<string, unkn
 
   // Convert Anthropic tool defs → OpenAI function defs
   if (Array.isArray(parsed.tools) && (parsed.tools as unknown[]).length > 0) {
-    out.tools = (parsed.tools as Array<{ name: string; description: string; input_schema: unknown }>).map(
-      (t) => ({
-        type: 'function',
-        function: { name: t.name, description: t.description, parameters: t.input_schema },
-      }),
-    );
+    out.tools = (
+      parsed.tools as Array<{
+        name: string;
+        description: string;
+        input_schema: unknown;
+      }>
+    ).map((t) => ({
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.input_schema,
+      },
+    }));
   }
 
   return out;
 }
 
-function openAIToAnthropic(body: Record<string, unknown>): Record<string, unknown> {
+function openAIToAnthropic(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
   const choices = body.choices as Array<{
     finish_reason: string;
-    message: { role: string; content: string | null; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> };
+    message: {
+      role: string;
+      content: string | null;
+      tool_calls?: Array<{
+        id: string;
+        function: { name: string; arguments: string };
+      }>;
+    };
   }>;
   const choice = choices?.[0];
   const msg = choice?.message;
-  const usage = body.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  const usage = body.usage as
+    | { prompt_tokens?: number; completion_tokens?: number }
+    | undefined;
 
-  const content: Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }> = [];
+  const content: Array<{
+    type: string;
+    text?: string;
+    id?: string;
+    name?: string;
+    input?: unknown;
+  }> = [];
 
   if (msg?.content) content.push({ type: 'text', text: msg.content });
 
   if (msg?.tool_calls) {
     for (const tc of msg.tool_calls) {
       let input: unknown = {};
-      try { input = JSON.parse(tc.function.arguments); } catch { /* keep empty */ }
-      content.push({ type: 'tool_use', id: tc.id, name: tc.function.name, input });
+      try {
+        input = JSON.parse(tc.function.arguments);
+      } catch {
+        /* keep empty */
+      }
+      content.push({
+        type: 'tool_use',
+        id: tc.id,
+        name: tc.function.name,
+        input,
+      });
     }
   }
 
@@ -196,7 +255,8 @@ function openAIToAnthropic(body: Record<string, unknown>): Record<string, unknow
     role: 'assistant',
     content,
     model: body.model,
-    stop_reason: choice?.finish_reason === 'tool_calls' ? 'tool_use' : 'end_turn',
+    stop_reason:
+      choice?.finish_reason === 'tool_calls' ? 'tool_use' : 'end_turn',
     stop_sequence: null,
     usage: {
       input_tokens: usage?.prompt_tokens ?? 0,
@@ -229,30 +289,49 @@ function handleOpenAIBridge(
 
   const BRIDGE_TIMEOUT_MS = 90_000;
 
+  // Wall-clock timeout — fires even if OpenRouter sends headers but hangs on body
+  let done = false;
+  const timer = setTimeout(() => {
+    if (done) return;
+    done = true;
+    logger.warn({ timeout: BRIDGE_TIMEOUT_MS }, 'OpenAI bridge request timed out');
+    upstream.destroy();
+    if (!res.headersSent) {
+      res.writeHead(504);
+      res.end('Gateway Timeout: model did not respond in time');
+    }
+  }, BRIDGE_TIMEOUT_MS);
+
   const upstream = makeRequest(
     {
       hostname: upstreamUrl.hostname,
       port: upstreamUrl.port || (isHttps ? 443 : 80),
-      path: (upstreamUrl.pathname.replace(/\/$/, '')) + '/chat/completions',
+      path: upstreamUrl.pathname.replace(/\/$/, '') + '/chat/completions',
       method: 'POST',
       headers,
-      timeout: BRIDGE_TIMEOUT_MS,
     } as RequestOptions,
     (upRes) => {
       const chunks: Buffer[] = [];
       upRes.on('data', (c: Buffer) => chunks.push(c));
       upRes.on('end', () => {
+        done = true;
+        clearTimeout(timer);
         try {
           const raw = Buffer.concat(chunks).toString('utf-8');
           const openaiResp = JSON.parse(raw) as Record<string, unknown>;
           if (openaiResp.error) {
-            res.writeHead(upRes.statusCode ?? 400, { 'content-type': 'application/json' });
+            res.writeHead(upRes.statusCode ?? 400, {
+              'content-type': 'application/json',
+            });
             res.end(JSON.stringify(openaiResp));
             return;
           }
           const anthropicResp = openAIToAnthropic(openaiResp);
           const out = Buffer.from(JSON.stringify(anthropicResp), 'utf-8');
-          res.writeHead(200, { 'content-type': 'application/json', 'content-length': out.length });
+          res.writeHead(200, {
+            'content-type': 'application/json',
+            'content-length': out.length,
+          });
           res.end(out);
         } catch (e) {
           res.writeHead(502);
@@ -262,15 +341,14 @@ function handleOpenAIBridge(
     },
   );
 
-  upstream.on('timeout', () => {
-    logger.warn({ timeout: BRIDGE_TIMEOUT_MS }, 'OpenAI bridge request timed out');
-    upstream.destroy();
-    if (!res.headersSent) { res.writeHead(504); res.end('Gateway Timeout: model did not respond in time'); }
-  });
-
   upstream.on('error', (err) => {
+    done = true;
+    clearTimeout(timer);
     logger.error({ err }, 'OpenAI bridge upstream error');
-    if (!res.headersSent) { res.writeHead(502); res.end('Bad Gateway'); }
+    if (!res.headersSent) {
+      res.writeHead(502);
+      res.end('Bad Gateway');
+    }
   });
 
   upstream.write(bodyBuf);
@@ -301,9 +379,12 @@ export function startCredentialProxy(
   ]);
 
   const authMode: AuthMode = secrets.ANTHROPIC_API_KEY ? 'api-key' : 'oauth';
-  const oauthToken = secrets.CLAUDE_CODE_OAUTH_TOKEN || secrets.ANTHROPIC_AUTH_TOKEN;
+  const oauthToken =
+    secrets.CLAUDE_CODE_OAUTH_TOKEN || secrets.ANTHROPIC_AUTH_TOKEN;
 
-  const upstreamUrl = new URL(secrets.ANTHROPIC_BASE_URL || 'https://api.anthropic.com');
+  const upstreamUrl = new URL(
+    secrets.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
+  );
   const isHttps = upstreamUrl.protocol === 'https:';
   const makeRequest = isHttps ? httpsRequest : httpRequest;
 
@@ -316,13 +397,19 @@ export function startCredentialProxy(
 
         if (req.headers['content-type']?.includes('application/json')) {
           try {
-            const parsed = JSON.parse(body.toString('utf-8')) as Record<string, unknown>;
+            const parsed = JSON.parse(body.toString('utf-8')) as Record<
+              string,
+              unknown
+            >;
 
             if (!passthrough) {
               condenseRequest(parsed, secrets.ANTHROPIC_MODEL);
 
               // Non-Anthropic model: convert to OpenAI format and bridge
-              if (req.url?.includes('/messages') && isNonAnthropicModel(parsed.model as string)) {
+              if (
+                req.url?.includes('/messages') &&
+                isNonAnthropicModel(parsed.model as string)
+              ) {
                 const apiKey = secrets.ANTHROPIC_API_KEY || oauthToken || '';
                 handleOpenAIBridge(parsed, upstreamUrl, apiKey, res);
                 return;
@@ -335,11 +422,12 @@ export function startCredentialProxy(
           }
         }
 
-        const headers: Record<string, string | number | string[] | undefined> = {
-          ...(req.headers as Record<string, string>),
-          host: upstreamUrl.host,
-          'content-length': body.length,
-        };
+        const headers: Record<string, string | number | string[] | undefined> =
+          {
+            ...(req.headers as Record<string, string>),
+            host: upstreamUrl.host,
+            'content-length': body.length,
+          };
 
         delete headers['connection'];
         delete headers['keep-alive'];
@@ -357,6 +445,19 @@ export function startCredentialProxy(
 
         const PROXY_TIMEOUT_MS = 90_000;
 
+        // Wall-clock timeout — fires even if upstream sends headers but hangs on body
+        let proxyDone = false;
+        const proxyTimer = setTimeout(() => {
+          if (proxyDone) return;
+          proxyDone = true;
+          logger.warn({ timeout: PROXY_TIMEOUT_MS, url: req.url }, 'Credential proxy request timed out');
+          upstream.destroy();
+          if (!res.headersSent) {
+            res.writeHead(504);
+            res.end('Gateway Timeout: model did not respond in time');
+          }
+        }, PROXY_TIMEOUT_MS);
+
         const upstream = makeRequest(
           {
             hostname: upstreamUrl.hostname,
@@ -364,23 +465,25 @@ export function startCredentialProxy(
             path: req.url,
             method: req.method,
             headers,
-            timeout: PROXY_TIMEOUT_MS,
           } as RequestOptions,
           (upRes) => {
             res.writeHead(upRes.statusCode!, upRes.headers);
             upRes.pipe(res);
+            upRes.on('end', () => { proxyDone = true; clearTimeout(proxyTimer); });
           },
         );
 
-        upstream.on('timeout', () => {
-          logger.warn({ timeout: PROXY_TIMEOUT_MS, url: req.url }, 'Credential proxy request timed out');
-          upstream.destroy();
-          if (!res.headersSent) { res.writeHead(504); res.end('Gateway Timeout: model did not respond in time'); }
-        });
-
         upstream.on('error', (err) => {
-          logger.error({ err, url: req.url }, 'Credential proxy upstream error');
-          if (!res.headersSent) { res.writeHead(502); res.end('Bad Gateway'); }
+          proxyDone = true;
+          clearTimeout(proxyTimer);
+          logger.error(
+            { err, url: req.url },
+            'Credential proxy upstream error',
+          );
+          if (!res.headersSent) {
+            res.writeHead(502);
+            res.end('Bad Gateway');
+          }
         });
 
         upstream.write(body);
