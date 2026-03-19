@@ -287,14 +287,17 @@ function handleOpenAIBridge(
     authorization: `Bearer ${apiKey}`,
   };
 
-  const BRIDGE_TIMEOUT_MS = 90_000;
+  const BRIDGE_TIMEOUT_MS = 30_000;
 
   // Wall-clock timeout — fires even if OpenRouter sends headers but hangs on body
   let done = false;
   const timer = setTimeout(() => {
     if (done) return;
     done = true;
-    logger.warn({ timeout: BRIDGE_TIMEOUT_MS }, 'OpenAI bridge request timed out');
+    logger.warn(
+      { timeout: BRIDGE_TIMEOUT_MS },
+      'OpenAI bridge request timed out',
+    );
     upstream.destroy();
     if (!res.headersSent) {
       res.writeHead(504);
@@ -443,14 +446,17 @@ export function startCredentialProxy(
           }
         }
 
-        const PROXY_TIMEOUT_MS = 90_000;
+        const PROXY_TIMEOUT_MS = 30_000;
 
         // Wall-clock timeout — fires even if upstream sends headers but hangs on body
         let proxyDone = false;
         const proxyTimer = setTimeout(() => {
           if (proxyDone) return;
           proxyDone = true;
-          logger.warn({ timeout: PROXY_TIMEOUT_MS, url: req.url }, 'Credential proxy request timed out');
+          logger.warn(
+            { timeout: PROXY_TIMEOUT_MS, url: req.url },
+            'Credential proxy request timed out',
+          );
           upstream.destroy();
           if (!res.headersSent) {
             res.writeHead(504);
@@ -469,7 +475,10 @@ export function startCredentialProxy(
           (upRes) => {
             res.writeHead(upRes.statusCode!, upRes.headers);
             upRes.pipe(res);
-            upRes.on('end', () => { proxyDone = true; clearTimeout(proxyTimer); });
+            upRes.on('end', () => {
+              proxyDone = true;
+              clearTimeout(proxyTimer);
+            });
           },
         );
 
