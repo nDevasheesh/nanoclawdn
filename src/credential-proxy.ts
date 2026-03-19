@@ -55,6 +55,7 @@ function condenseRequest(
   // Drop heavy Claude Code code-editing tools (Bash, Read, Write, etc.) that
   // exceed non-Anthropic model context limits, but keep Task/TeamCreate so
   // Delo (Flash) can spawn Claude coding sub-agents for coding work.
+  // Explicitly block schedule_task so Delo uses Task() directly for immediate work.
   const AGENT_TOOLS = new Set([
     'Task',
     'TaskOutput',
@@ -63,9 +64,16 @@ function condenseRequest(
     'TeamDelete',
     'SendMessage',
   ]);
+  const BLOCKED_MCP_TOOLS = new Set([
+    'mcp__nanoclaw__schedule_task',
+    'mcp__nanoclaw__list_tasks',
+    'mcp__nanoclaw__cancel_task',
+  ]);
   if (Array.isArray(parsed.tools)) {
     parsed.tools = (parsed.tools as Array<{ name: string }>).filter(
-      (t) => t.name.startsWith('mcp__nanoclaw__') || AGENT_TOOLS.has(t.name),
+      (t) =>
+        !BLOCKED_MCP_TOOLS.has(t.name) &&
+        (t.name.startsWith('mcp__nanoclaw__') || AGENT_TOOLS.has(t.name)),
     );
     if ((parsed.tools as unknown[]).length === 0) delete parsed.tools;
   }

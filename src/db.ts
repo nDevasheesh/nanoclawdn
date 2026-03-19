@@ -348,8 +348,11 @@ export function getMessagesSince(
   // Never look back further than windowMinutes, even if sinceTimestamp is
   // empty or very old. This prevents dumping hundreds of historical messages
   // into the prompt on fresh starts or after long inactivity.
-  const windowFloor = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
-  const effectiveSince = sinceTimestamp > windowFloor ? sinceTimestamp : windowFloor;
+  const windowFloor = new Date(
+    Date.now() - windowMinutes * 60 * 1000,
+  ).toISOString();
+  const effectiveSince =
+    sinceTimestamp > windowFloor ? sinceTimestamp : windowFloor;
 
   // Filter bot messages using both the is_bot_message flag AND the content
   // prefix as a backstop for messages written before the migration ran.

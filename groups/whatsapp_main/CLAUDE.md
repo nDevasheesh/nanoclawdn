@@ -16,6 +16,8 @@ You do NOT have Bash, Read, or file tools. Do NOT try to use them.
 
 Spawn ONE Task immediately. Put everything Claude needs inside the prompt. Your reply text tells the user what you did.
 
+*CRITICAL: Use the `Task` tool — NOT `schedule_task`. `Task` runs immediately. `schedule_task` is for future scheduled jobs and MUST NOT be used for code work.*
+
 ```
 Task(
   description="<short description>",

@@ -7,10 +7,10 @@ import fs from 'fs';
 import path from 'path';
 
 import {
+  CLAUDE_PROXY_PORT,
   CONTAINER_IMAGE,
   CONTAINER_MAX_OUTPUT_SIZE,
   CONTAINER_TIMEOUT,
-  CREDENTIAL_PROXY_PORT,
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
@@ -228,10 +228,13 @@ function buildContainerArgs(
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
 
-  // Route API traffic through the credential proxy (containers never see real secrets)
+  // Route API traffic through the credential proxy (containers never see real secrets).
+  // Use the Claude proxy port (passthrough) so Task sub-agents inside containers
+  // get the full Claude Sonnet tool set. The condensed Gemini proxy (CREDENTIAL_PROXY_PORT)
+  // is used only for the host-side orchestration proxy, not for containers.
   args.push(
     '-e',
-    `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`,
+    `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CLAUDE_PROXY_PORT}`,
   );
 
   // Mirror the host's auth method with a placeholder value.
