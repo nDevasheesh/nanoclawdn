@@ -122,6 +122,9 @@ function buildVolumeMounts(
     '.claude',
   );
   fs.mkdirSync(groupSessionsDir, { recursive: true });
+  // Ensure the container user (node, uid=1000) can write to the sessions dir
+  fs.chownSync(path.dirname(groupSessionsDir), 1000, 1000);
+  fs.chownSync(groupSessionsDir, 1000, 1000);
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
   if (!fs.existsSync(settingsFile)) {
     fs.writeFileSync(
@@ -169,6 +172,10 @@ function buildVolumeMounts(
   fs.mkdirSync(path.join(groupIpcDir, 'messages'), { recursive: true });
   fs.mkdirSync(path.join(groupIpcDir, 'tasks'), { recursive: true });
   fs.mkdirSync(path.join(groupIpcDir, 'input'), { recursive: true });
+  // Make IPC dirs writable by the container user (node, uid=1000)
+  fs.chmodSync(path.join(groupIpcDir, 'messages'), 0o777);
+  fs.chmodSync(path.join(groupIpcDir, 'tasks'), 0o777);
+  fs.chmodSync(path.join(groupIpcDir, 'input'), 0o777);
   mounts.push({
     hostPath: groupIpcDir,
     containerPath: '/workspace/ipc',

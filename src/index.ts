@@ -3,6 +3,7 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
+  CLAUDE_PROXY_PORT,
   CREDENTIAL_PROXY_PORT,
   IDLE_TIMEOUT,
   POLL_INTERVAL,
@@ -39,6 +40,7 @@ import {
   setRegisteredGroup,
   setRouterState,
   setSession,
+  deleteSession,
   storeChatMetadata,
   storeMessage,
 } from './db.js';
@@ -336,6 +338,10 @@ async function runAgent(
         { group: group.name, error: output.error },
         'Container agent error',
       );
+      // Clear stale session so next run starts fresh instead of retrying
+      // a dead session that will never recover.
+      delete sessions[group.folder];
+      deleteSession(group.folder);
       return 'error';
     }
 
@@ -482,11 +488,20 @@ async function main(): Promise<void> {
     CREDENTIAL_PROXY_PORT,
     PROXY_BIND_HOST,
   );
+  // Claude passthrough proxy — no model override or request condensing.
+  // Coding sub-agents point ANTHROPIC_BASE_URL here to use Claude Sonnet
+  // while the main agent (Delo) continues using the Flash model on port 3001.
+  const claudeProxyServer = await startCredentialProxy(
+    CLAUDE_PROXY_PORT,
+    PROXY_BIND_HOST,
+    true,
+  );
 
   // Graceful shutdown handlers
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
     proxyServer.close();
+    claudeProxyServer.close();
     await queue.shutdown(10000);
     for (const ch of channels) await ch.disconnect();
     process.exit(0);

@@ -63,6 +63,11 @@ RUN chown -R node:node /workspace && chmod 777 /home/node
 # Switch to non-root user (required for --dangerously-skip-permissions)
 USER node
 
+# Configure git for the node user: trust all mounted dirs (isolated container) and set identity
+RUN git config --global --add safe.directory '*' \
+ && git config --global user.email "devasheeshh1@gmail.com" \
+ && git config --global user.name "Devasheesh NanoClaw"
+
 # Set working directory to group workspace
 WORKDIR /workspace/group
 

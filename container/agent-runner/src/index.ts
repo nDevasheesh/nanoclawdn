@@ -366,11 +366,24 @@ async function runQuery(
   let messageCount = 0;
   let resultCount = 0;
 
-  // Load global CLAUDE.md as additional system context (shared across all groups)
+  // Load CLAUDE.md files to inject as system prompt context.
+  // The SDK's programmatic query() does not reliably auto-discover CLAUDE.md
+  // from cwd, so we read and inject them explicitly via systemPrompt.append.
+  const groupClaudeMdPath = '/workspace/group/CLAUDE.md';
   const globalClaudeMdPath = '/workspace/global/CLAUDE.md';
-  let globalClaudeMd: string | undefined;
+  const claudeMdParts: string[] = [];
+
+  // Group CLAUDE.md — always inject when present (main and non-main)
+  if (fs.existsSync(groupClaudeMdPath)) {
+    claudeMdParts.push(fs.readFileSync(groupClaudeMdPath, 'utf-8'));
+  }
+  // Global CLAUDE.md — inject for non-main groups only
   if (!containerInput.isMain && fs.existsSync(globalClaudeMdPath)) {
-    globalClaudeMd = fs.readFileSync(globalClaudeMdPath, 'utf-8');
+    claudeMdParts.push(fs.readFileSync(globalClaudeMdPath, 'utf-8'));
+  }
+  const claudeMdAppend = claudeMdParts.length > 0 ? claudeMdParts.join('\n\n---\n\n') : undefined;
+  if (claudeMdAppend) {
+    log(`Injecting CLAUDE.md (${claudeMdAppend.length} chars) into system prompt`);
   }
 
   // Discover additional directories mounted at /workspace/extra/*
@@ -396,8 +409,8 @@ async function runQuery(
       additionalDirectories: extraDirs.length > 0 ? extraDirs : undefined,
       resume: sessionId,
       resumeSessionAt: resumeAt,
-      systemPrompt: globalClaudeMd
-        ? { type: 'preset' as const, preset: 'claude_code' as const, append: globalClaudeMd }
+      systemPrompt: claudeMdAppend
+        ? { type: 'preset' as const, preset: 'claude_code' as const, append: claudeMdAppend }
         : undefined,
       allowedTools: [
         'Bash',

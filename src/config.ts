@@ -51,6 +51,12 @@ export const CREDENTIAL_PROXY_PORT = parseInt(
   process.env.CREDENTIAL_PROXY_PORT || '3001',
   10,
 );
+// Second proxy that passes requests through to Anthropic/OpenRouter as-is (no model override).
+// Used by coding sub-agents inside containers to access Claude Sonnet instead of the default Flash model.
+export const CLAUDE_PROXY_PORT = parseInt(
+  process.env.CLAUDE_PROXY_PORT || '3002',
+  10,
+);
 export const IPC_POLL_INTERVAL = 1000;
 export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min default — how long to keep container alive after last result
 export const MAX_CONCURRENT_CONTAINERS = Math.max(

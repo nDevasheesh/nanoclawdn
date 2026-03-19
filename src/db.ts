@@ -342,8 +342,15 @@ export function getMessagesSince(
   chatJid: string,
   sinceTimestamp: string,
   botPrefix: string,
-  limit: number = 200,
+  limit: number = 30,
+  windowMinutes: number = 10,
 ): NewMessage[] {
+  // Never look back further than windowMinutes, even if sinceTimestamp is
+  // empty or very old. This prevents dumping hundreds of historical messages
+  // into the prompt on fresh starts or after long inactivity.
+  const windowFloor = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+  const effectiveSince = sinceTimestamp > windowFloor ? sinceTimestamp : windowFloor;
+
   // Filter bot messages using both the is_bot_message flag AND the content
   // prefix as a backstop for messages written before the migration ran.
   // Subquery takes the N most recent, outer query re-sorts chronologically.
@@ -360,7 +367,7 @@ export function getMessagesSince(
   `;
   return db
     .prepare(sql)
-    .all(chatJid, sinceTimestamp, `${botPrefix}:%`, limit) as NewMessage[];
+    .all(chatJid, effectiveSince, `${botPrefix}:%`, limit) as NewMessage[];
 }
 
 export function createTask(
@@ -524,6 +531,10 @@ export function setSession(groupFolder: string, sessionId: string): void {
   db.prepare(
     'INSERT OR REPLACE INTO sessions (group_folder, session_id) VALUES (?, ?)',
   ).run(groupFolder, sessionId);
+}
+
+export function deleteSession(groupFolder: string): void {
+  db.prepare('DELETE FROM sessions WHERE group_folder = ?').run(groupFolder);
 }
 
 export function getAllSessions(): Record<string, string> {
